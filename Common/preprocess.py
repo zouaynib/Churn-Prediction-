@@ -39,11 +39,11 @@ def load_data(csv_path: str, target_col: str) -> pd.DataFrame:
     
     X = data.drop(columns=[target_col])
     y = data[target_col]
-    
+
     return data
 
 
-def split_train_test(
+def split_train_val_test(
     data: pd.DataFrame,
     target_col: str,
     test_size: float = 0.2,
@@ -91,4 +91,17 @@ def scale_data(
     return X_train_scaled, X_val_scaled, X_test_scaled  
 
 
-    
+def preprocess_data( 
+    csv_path: str,
+    test_size: float= 0.2,
+    val_size : float= 0.1,
+    random_state: int = 42,
+    stratify: bool = True,
+    scale_numeric : bool = True ) -> PreprocessingOutput :
+
+    data = load_data(csv_path)
+    X = data.drop(columns=["Churn"])
+    y = data["Churn"]
+
+    splits = split_train_val_test(X, y, test_size=test_size, val_size= val_size, random_state = random_state, stratify = stratify)
+
