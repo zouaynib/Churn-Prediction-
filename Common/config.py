@@ -1,0 +1,19 @@
+DATA_PATH = "Data/WA_Fn-UseC_-Telco-Customer-Churn.csv"
+TARGET_COL = "Churn"
+
+TEST_SIZE = 0.2
+VAL_SIZE = 0.1
+RANDOM_STATE = 42
+STRATIFY = True
+
+
+SCALE_NUMERIC = False
+SCALER_TYPE = "standard"
+
+
+DEFAULT_THRESHOLD = 0.5
+TUNE_THRESHOLD = True
+THRESHOLD_METRIC = "f1"
+
+
+OUTPUT_DIR = "outputs"
