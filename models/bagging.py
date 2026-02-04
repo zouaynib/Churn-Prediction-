@@ -2,7 +2,7 @@ from __future__ import annotations
 from sklearn.ensemble import BaggingClassifier
 from sklearn.tree import DecisionTreeClassifier
 
-def build_model_bagging(
+def build_model(
     n_estimators: int = 300,
     max_samples: float = 0.8,
     max_features: float = 1.0,
