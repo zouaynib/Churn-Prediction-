@@ -8,20 +8,23 @@ import json
 import numpy as np
 
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_auc_score, average_precision_score, matthews_corrcoef, classification_report
-from sklearn.exceptios import NotFittedError, UndefinedMetricWarning
+from sklearn.exceptions import NotFittedError, UndefinedMetricWarning
 
 def get_scores(model, X:np.ndarray) -> np.ndarray :
 
-    if hasattr(model, "predictproba") :
+    if hasattr(model, "predict_proba") :
         return model.predict_proba(X)[:, 1]
     
 
-    if hasattr(model, "decision_function") :
-        s = model.decision_function(X)
-        s = np.asarray(s, dtype=np.float64)
-        s = (s - s.min()) / (s.max() - s.min())
+    if hasattr(model, "decision_function"):
+        s = np.asarray(model.decision_function(X), dtype=np.float64)
+        den = (s.max() - s.min())
+        if den > 0:
+            s = (s - s.min()) / den
+        else:
+            s = np.zeros_like(s)
         return s
-    
+
 
     return model.predict(X).astype(np.float64)
 
@@ -36,29 +39,29 @@ def tune_threshold(y_true:np.ndarray, scores:np.ndarray, metric: str ="f1", grid
     if grid is None :
         grid = np.linspace(0.05, 0.95, 19)
 
-        metric = metric.lower()
-        best_t, best_v = 0.5, -1
+    metric = metric.lower()
+    best_t, best_v = 0.5, -1
 
-        for t in grid :
-            y_pred = predict_at_threshold(scores, float(t))
+    for t in grid :
+        y_pred = predict_at_threshold(scores, float(t))
 
-            if metric == "accuracy" :
-                v = accuracy_score(y_true, y_pred)
-            elif metric == "precision" :
-                v = precision_score(y_true, y_pred)
-            elif metric == "recall" :
-                v = recall_score(y_true, y_pred)
-            elif metric == "f1" :
-                v = f1_score(y_true, y_pred)
-            elif metric == "mcc" :
-                v = matthews_corrcoef(y_true, y_pred)
-            else :
-                raise ValueError(f"Unsupported metric: {metric}")
+        if metric == "accuracy" :
+            v = accuracy_score(y_true, y_pred, zero_division=0)
+        elif metric == "precision" :
+            v = precision_score(y_true, y_pred, zero_division=0)
+        elif metric == "recall" :
+            v = recall_score(y_true, y_pred,zero_division=0)
+        elif metric == "f1" :
+            v = f1_score(y_true, y_pred,zero_division=0)
+        elif metric == "mcc" :
+            v = matthews_corrcoef(y_true, y_pred)
+        else :
+            raise ValueError(f"Unsupported metric: {metric}")
 
-            if v > best_v :
-                best_t, best_v = float(t), float(v)
+        if v > best_v :
+            best_t, best_v = float(t), float(v)
 
-        return best_t, best_v
+    return best_t, best_v
 
 def evaluate_binary(
     y_true: np.ndarray,
@@ -94,3 +97,13 @@ def save_json(report: Dict[str, Any], out_path: str | Path) -> None:
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(report, indent=2))
+
+
+    """ customers who leave are what we are trying yo prevent that's why false negatives are more 
+    expensive : predicting there i no churn why there actually is. that's I will lower  the threshold to raise the f1 score and the recall
+    
+    Recall : of all customers who actually churned, how much did the model catch ? TP / TP + FN"""
+
+
+
+

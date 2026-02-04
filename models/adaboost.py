@@ -5,7 +5,7 @@ def build_model_adaboost(random_state: int = 42) -> AdaBoostClassifier:
     model = AdaBoostClassifier(
         n_estimators=300,
         learning_rate=0.5,
-        algorithm="SAMME.R",
+        algorithm="SAMME",
         random_state=random_state,
     )
 
