@@ -7,7 +7,7 @@ import lightgbm as lgb
 import xgboost as xgb
 
 
-def build_stacking_model(
+def build_model(
     use_probabilities: bool = True,
     final_estimator_C: float = 1.0,
     cv: int = 5,
