@@ -15,8 +15,6 @@ def build_model(
         n_estimators=n_estimators,
         max_samples=max_samples,
         max_features=max_features,
-        bootstrap=True,
-        oob_score=True,
         n_jobs=-1,
         random_state=random_state,
     )

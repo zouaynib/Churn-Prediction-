@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import importlib
-from pathlib import Path
 from typing import Dict, Any
 
-import joblib
 import numpy as np
 from sklearn.pipeline import Pipeline
 
@@ -70,24 +68,6 @@ def main() -> None:
 
         pipeline = Pipeline([("model", model)])
         pipeline.fit(data.X_train, data.y_train)
-
-        # Print OOB score if the model supports it
-        inner_model = pipeline.named_steps["model"]
-        if hasattr(inner_model, "oob_score_"):
-            print(f"[OOB] score = {inner_model.oob_score_:.4f}")
-
-        # Hard-voting classifiers have no predict_proba; evaluate with hard predictions only
-        supports_proba = hasattr(pipeline, "predict_proba")
-        if not supports_proba:
-            print("[INFO] Model does not support predict_proba — skipping threshold tuning")
-            test_preds = pipeline.predict(data.X_test)
-            rep_default = evaluate_binary(data.y_test, test_preds.astype(float), threshold=DEFAULT_THRESHOLD)
-            results[name] = {
-                "val": {"t_f1": None, "f1": None, "t_mcc": None, "mcc": None},
-                "test": {"default": rep_default, "f1": rep_default, "mcc": rep_default},
-            }
-            print(f"[TEST] F1={rep_default['f1']:.3f} | ROC_AUC=N/A (hard voting)")
-            continue
 
         val_scores = pipeline.predict_proba(data.X_val)[:, 1]
         t_f1, v_f1 = tune_threshold(data.y_val, val_scores, metric="f1", grid=grid)

@@ -20,8 +20,6 @@ def build_model(
         min_samples_leaf=min_samples_leaf,
         max_features=max_features,
         class_weight=class_weight,
-        bootstrap=True,
-        oob_score=True,
         n_jobs=-1,
         random_state=random_state,
     )
