@@ -88,7 +88,7 @@ def build_model(
     
     return VotingClassifier(
         estimators=estimators,
-        voting="soft",
+        voting="hard",
         weights=weights,
         n_jobs=n_jobs,
         verbose=False,
