@@ -1,4 +1,27 @@
+# Core ML
 numpy==2.1.0
 pandas==2.2.2
 scikit-learn==1.4.2
+xgboost>=2.0.0
+lightgbm>=4.0.0
+deslib>=0.3.5
+
+# Visualisation
 matplotlib==3.9.2
+
+# Explainability
+shap>=0.45.0
+
+# Interactive demo
+streamlit>=1.35.0
+
+# REST API
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.7.0
+
+# Rich terminal output (optional but recommended)
+rich>=13.0.0
+
+# Model persistence
+joblib>=1.4.0

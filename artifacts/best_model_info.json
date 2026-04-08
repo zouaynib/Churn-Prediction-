@@ -1,0 +1,8 @@
+{
+  "name": "adaboost",
+  "threshold_f1": 0.456,
+  "threshold_mcc": 0.384,
+  "threshold_biz": 0.36000000000000004,
+  "cost_fn": 500.0,
+  "cost_fp": 50.0
+}

@@ -46,8 +46,10 @@ def load_data(csv_path: str, target_col: str) -> tuple[pd.DataFrame, pd.Series]:
     data = read_csv(Path(csv_path))
 
 
-    if "CustomerID" in data.columns:
-        data = data.drop(columns=["CustomerID"])
+    # Drop customer ID column (case-insensitive check)
+    id_cols = [c for c in data.columns if c.lower() == "customerid"]
+    if id_cols:
+        data = data.drop(columns=id_cols)
 
 
     if "TotalCharges" in data.columns:
