@@ -10,7 +10,7 @@ def build_model(
     reg_alpha: float = 0.0,
     min_child_weight: float = 1.0,
     gamma: float = 0.0,
-    scale_pos_weight: float | None = None,  # set if you want cost-sensitive learning
+    scale_pos_weight: float | None = 2.85,  # ~1034/371 class ratio
     random_state: int = 42,
 ):
 

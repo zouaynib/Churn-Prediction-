@@ -9,7 +9,7 @@ def build_model(
     base_max_depth: int | None = None,
     random_state: int = 42,
 ) -> BaggingClassifier:
-    base = DecisionTreeClassifier(max_depth=base_max_depth, random_state=random_state)
+    base = DecisionTreeClassifier(max_depth=base_max_depth, class_weight="balanced", random_state=random_state)
     return BaggingClassifier(
         estimator=base,
         n_estimators=n_estimators,

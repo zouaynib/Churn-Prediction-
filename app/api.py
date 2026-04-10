@@ -35,6 +35,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from Common.feature_engineering import engineer_features
+
 ARTIFACTS = Path("artifacts")
 REPORTS = Path("reports")
 DATA_DIR = Path("Data")
@@ -59,9 +61,9 @@ def _load_portfolio() -> pd.DataFrame:
     df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce")
     df = df.dropna(subset=["TotalCharges"])
 
-    # Drop customerID before preprocessing (it's not a feature)
+    # Drop customerID/Churn, then apply feature engineering
     feature_cols = [c for c in df.columns if c.lower() not in ("customerid", "churn")]
-    X_raw = df[feature_cols].copy()
+    X_raw = engineer_features(df[feature_cols].copy())
     X_transformed = preprocessor.transform(X_raw)
     probas = model.predict_proba(X_transformed)[:, 1]
 
@@ -191,6 +193,7 @@ def health():
 def predict(customer: CustomerFeatures):
     try:
         df = pd.DataFrame([customer.model_dump(exclude={"threshold"})])
+        df = engineer_features(df)
         X = preprocessor.transform(df)
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Preprocessing failed: {exc}")
@@ -304,8 +307,8 @@ def portfolio_customers(
 @app.post("/whatif", tags=["What-If"])
 def whatif(req: WhatIfRequest):
     try:
-        df_orig = pd.DataFrame([req.original.model_dump(exclude={"threshold"})])
-        df_mod = pd.DataFrame([req.modified.model_dump(exclude={"threshold"})])
+        df_orig = engineer_features(pd.DataFrame([req.original.model_dump(exclude={"threshold"})]))
+        df_mod = engineer_features(pd.DataFrame([req.modified.model_dump(exclude={"threshold"})]))
         X_orig = preprocessor.transform(df_orig)
         X_mod = preprocessor.transform(df_mod)
     except Exception as exc:

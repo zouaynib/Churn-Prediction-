@@ -1,8 +1,8 @@
 {
-  "name": "adaboost",
-  "threshold_f1": 0.456,
-  "threshold_mcc": 0.384,
-  "threshold_biz": 0.36000000000000004,
+  "name": "gradientboosting",
+  "threshold_f1": 0.241,
+  "threshold_mcc": 0.241,
+  "threshold_biz": 0.11,
   "cost_fn": 500.0,
   "cost_fp": 50.0
 }

@@ -3,6 +3,14 @@
   "tenure",
   "MonthlyCharges",
   "TotalCharges",
+  "AvgMonthlyCharge",
+  "ChargeIncrease",
+  "MonthlyToTotalRatio",
+  "IsNewCustomer",
+  "NumServices",
+  "HasSecurity",
+  "HasSupport",
+  "AutoPay",
   "gender_Female",
   "gender_Male",
   "Partner_No",
@@ -43,5 +51,9 @@
   "PaymentMethod_Bank transfer (automatic)",
   "PaymentMethod_Credit card (automatic)",
   "PaymentMethod_Electronic check",
-  "PaymentMethod_Mailed check"
+  "PaymentMethod_Mailed check",
+  "tenure_bin_0-12",
+  "tenure_bin_13-24",
+  "tenure_bin_25-48",
+  "tenure_bin_49-72"
 ]

@@ -8,9 +8,9 @@ def build_model(
     learning_rate: float = 0.03,
     max_depth: int = 3,
     subsample: float = 0.8,
+    min_samples_split: int = 20,
+    min_samples_leaf: int = 10,
     random_state: int = 42,
-    min_samples_split = 20,
-    class_weight="balanced"
 ) -> GradientBoostingClassifier:
 
     return GradientBoostingClassifier(
@@ -18,5 +18,7 @@ def build_model(
         learning_rate=learning_rate,
         max_depth=max_depth,
         subsample=subsample,
+        min_samples_split=min_samples_split,
+        min_samples_leaf=min_samples_leaf,
         random_state=random_state,
     )

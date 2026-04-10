@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from Common.data import read_csv
+from Common.feature_engineering import engineer_features
 
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
@@ -199,7 +200,8 @@ def preprocess_data(
     random_state: int = 42,
     stratify: bool = True,
     scale_numeric: bool = False,
-    scaler_type: str = "standard"
+    scaler_type: str = "standard",
+    use_smote: bool = False,
 ) -> PreprocessingOutput:
 
     X, y = load_data(csv_path, target_col)
@@ -212,6 +214,12 @@ def preprocess_data(
         stratify=stratify
     )
 
+    # ── Feature engineering (on raw DataFrames, before ColumnTransformer) ─
+    splits.X_train = engineer_features(splits.X_train)
+    if len(splits.X_val) > 0:
+        splits.X_val = engineer_features(splits.X_val)
+    splits.X_test = engineer_features(splits.X_test)
+
     preprocessor, num_cols, cat_cols = build_preprocessor(
         splits.X_train,
         scale_numeric=scale_numeric,
@@ -222,13 +230,25 @@ def preprocess_data(
     X_val_p = preprocessor.transform(splits.X_val) if len(splits.X_val) > 0 else np.empty((0, X_train_p.shape[1]))
     X_test_p = preprocessor.transform(splits.X_test)
 
+    # ── Optional SMOTE oversampling (training set only) ──────────────────
+    y_train = splits.y_train
+    if use_smote:
+        try:
+            from imblearn.over_sampling import SMOTE
+            sm = SMOTE(random_state=random_state)
+            X_train_p, y_train = sm.fit_resample(X_train_p, y_train)
+            print(f"[SMOTE] Resampled training set: {X_train_p.shape[0]} samples")
+        except ImportError:
+            print("[WARN] imblearn not installed — skipping SMOTE. "
+                  "Install with: pip install imbalanced-learn")
+
     feature_names = get_feature_names(preprocessor, num_cols, cat_cols)
 
     return PreprocessingOutput(
         X_train=X_train_p,
         X_val=X_val_p,
         X_test=X_test_p,
-        y_train=splits.y_train,
+        y_train=y_train,
         y_val=splits.y_val,
         y_test=splits.y_test,
         feature_names=feature_names,
