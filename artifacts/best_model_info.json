@@ -1,8 +1,8 @@
 {
-  "name": "gradientboosting",
-  "threshold_f1": 0.241,
-  "threshold_mcc": 0.241,
-  "threshold_biz": 0.11,
+  "name": "voting_soft",
+  "threshold_f1": 0.397,
+  "threshold_mcc": 0.397,
+  "threshold_biz": 0.14,
   "cost_fn": 500.0,
   "cost_fp": 50.0
 }

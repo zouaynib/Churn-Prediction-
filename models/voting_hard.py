@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from sklearn.ensemble import VotingClassifier, GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.neural_network import MLPClassifier
 import lightgbm as lgb
 import xgboost as xgb
-from typing import Literal
 
 
 def build_model(
@@ -84,14 +85,36 @@ def build_model(
                 solver="lbfgs",
             ),
         ),
+        (
+            "svm",
+            SVC(
+                C=1.0,
+                kernel="rbf",
+                gamma="scale",
+                class_weight="balanced",
+                random_state=42,
+            ),
+        ),
+        (
+            "mlp",
+            MLPClassifier(
+                hidden_layer_sizes=(64, 32),
+                activation="relu",
+                solver="adam",
+                learning_rate="adaptive",
+                learning_rate_init=0.001,
+                max_iter=500,
+                early_stopping=True,
+                validation_fraction=0.1,
+                random_state=42,
+            ),
+        ),
     ]
-    
+
     return VotingClassifier(
         estimators=estimators,
-        voting="soft",
+        voting="hard",
         weights=weights,
         n_jobs=n_jobs,
         verbose=False,
     )
-
-

@@ -71,10 +71,16 @@ MODEL_MODULES = [
     "models.gradientboosting",
     "models.lightgbm_model",
     "models.randomforest",
+    "models.xgboost",
+    # Non-tree models (diverse learners)
+    "models.logistic_regression",
+    "models.svm",
+    "models.knn",
+    "models.mlp",
+    # Meta-ensembles (must come after base models)
     "models.stacking",
     "models.voting_hard",
     "models.voting_soft",
-    "models.xgboost",
 ]
 
 

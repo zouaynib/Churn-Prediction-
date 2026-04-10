@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from sklearn.ensemble import VotingClassifier, GradientBoostingClassifier, RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.neural_network import MLPClassifier
 import lightgbm as lgb
 import xgboost as xgb
 
@@ -41,7 +43,7 @@ def build_model(
                 gamma=0.1,
                 reg_alpha=0.1,
                 reg_lambda=1.0,
-                scale_pos_weight=3, 
+                scale_pos_weight=3,
                 random_state=42,
                 eval_metric="logloss",
                 verbosity=0,
@@ -72,8 +74,33 @@ def build_model(
                 n_jobs=-1,
             ),
         ),
+        (
+            "svm",
+            SVC(
+                C=1.0,
+                kernel="rbf",
+                gamma="scale",
+                class_weight="balanced",
+                probability=True,
+                random_state=42,
+            ),
+        ),
+        (
+            "mlp",
+            MLPClassifier(
+                hidden_layer_sizes=(64, 32),
+                activation="relu",
+                solver="adam",
+                learning_rate="adaptive",
+                learning_rate_init=0.001,
+                max_iter=500,
+                early_stopping=True,
+                validation_fraction=0.1,
+                random_state=42,
+            ),
+        ),
     ]
-    
+
     return VotingClassifier(
         estimators=estimators,
         voting="soft",
@@ -81,5 +108,3 @@ def build_model(
         n_jobs=n_jobs,
         verbose=False,
     )
-
-

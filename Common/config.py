@@ -7,7 +7,7 @@ RANDOM_STATE = 42
 STRATIFY = True
 
 
-SCALE_NUMERIC = False
+SCALE_NUMERIC = True
 SCALER_TYPE = "standard"
 
 

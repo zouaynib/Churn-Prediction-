@@ -693,6 +693,316 @@ def abtest_simulate(req: ABTestRequest):
     }
 
 
+# ── Customer Lookup ─────────────────────────────────────────────────────────
+
+def _customer_detail(row: pd.Series) -> dict:
+    """Build a rich customer detail dict from a portfolio row."""
+    p = float(row["churn_probability"])
+    lifetime = _expected_lifetime_months(row.get("Contract", ""))
+    annual_rev = float(row["MonthlyCharges"]) * 12
+    rev_at_risk = p * float(row["MonthlyCharges"]) * lifetime
+
+    # Build intervention suggestions using the what-if engine
+    interventions = []
+    base_features = {
+        c: row[c]
+        for c in row.index
+        if c.lower() not in ("customerid", "churn", "churn_probability", "risk_tier", "predicted_churn")
+    }
+
+    # Suggest contract upgrade if month-to-month
+    if row.get("Contract") == "Month-to-month":
+        interventions.append({
+            "action": "Upgrade to 1-year contract",
+            "category": "Contract",
+            "priority": "high",
+            "estimated_cost": 0,
+            "description": "Month-to-month customers churn 3x more. Offer a 1-year contract with a loyalty discount.",
+        })
+    # Suggest tech support
+    if row.get("TechSupport") == "No" and row.get("InternetService") != "No":
+        interventions.append({
+            "action": "Add free Tech Support (3 months)",
+            "category": "Service",
+            "priority": "medium",
+            "estimated_cost": 30,
+            "description": "Tech support is a top churn reducer. Offer 3 months free trial.",
+        })
+    # Suggest online security
+    if row.get("OnlineSecurity") == "No" and row.get("InternetService") != "No":
+        interventions.append({
+            "action": "Add Online Security bundle",
+            "category": "Service",
+            "priority": "medium",
+            "estimated_cost": 20,
+            "description": "Customers with online security have significantly lower churn rates.",
+        })
+    # Suggest autopay
+    if row.get("PaymentMethod") == "Electronic check":
+        interventions.append({
+            "action": "Switch to automatic payment",
+            "category": "Billing",
+            "priority": "low",
+            "estimated_cost": 0,
+            "description": "Electronic check users churn 2x more. Incentivize auto-pay enrollment.",
+        })
+    # High charges
+    if float(row.get("MonthlyCharges", 0)) > 80:
+        interventions.append({
+            "action": "Offer 10-15% loyalty discount",
+            "category": "Pricing",
+            "priority": "high" if p > 0.6 else "medium",
+            "estimated_cost": float(row["MonthlyCharges"]) * 0.12,
+            "description": f"Monthly charges (${row['MonthlyCharges']:.0f}) are above average. A discount may retain this customer.",
+        })
+
+    return {
+        "customerID": str(row.get("customerID", "")),
+        "gender": str(row.get("gender", "")),
+        "SeniorCitizen": int(row.get("SeniorCitizen", 0)),
+        "Partner": str(row.get("Partner", "")),
+        "Dependents": str(row.get("Dependents", "")),
+        "tenure": int(row.get("tenure", 0)),
+        "PhoneService": str(row.get("PhoneService", "")),
+        "MultipleLines": str(row.get("MultipleLines", "")),
+        "InternetService": str(row.get("InternetService", "")),
+        "OnlineSecurity": str(row.get("OnlineSecurity", "")),
+        "OnlineBackup": str(row.get("OnlineBackup", "")),
+        "DeviceProtection": str(row.get("DeviceProtection", "")),
+        "TechSupport": str(row.get("TechSupport", "")),
+        "StreamingTV": str(row.get("StreamingTV", "")),
+        "StreamingMovies": str(row.get("StreamingMovies", "")),
+        "Contract": str(row.get("Contract", "")),
+        "PaperlessBilling": str(row.get("PaperlessBilling", "")),
+        "PaymentMethod": str(row.get("PaymentMethod", "")),
+        "MonthlyCharges": float(row.get("MonthlyCharges", 0)),
+        "TotalCharges": float(row.get("TotalCharges", 0)),
+        "churn_probability": round(p, 4),
+        "risk_tier": str(row.get("risk_tier", "")),
+        "predicted_churn": bool(row.get("predicted_churn", False)),
+        "actual_churn": str(row.get("Churn", "Unknown")),
+        "annual_revenue": round(annual_rev, 2),
+        "lifetime_months": int(lifetime),
+        "revenue_at_risk": round(rev_at_risk, 2),
+        "interventions": interventions,
+    }
+
+
+@app.get("/customer/{customer_id}", tags=["Customer"])
+def customer_lookup(customer_id: str):
+    matches = PORTFOLIO[PORTFOLIO["customerID"] == customer_id]
+    if matches.empty:
+        raise HTTPException(status_code=404, detail=f"Customer '{customer_id}' not found")
+    return _customer_detail(matches.iloc[0])
+
+
+@app.get("/customer/search/{query}", tags=["Customer"])
+def customer_search(query: str, limit: int = Query(10, ge=1, le=50)):
+    matches = PORTFOLIO[PORTFOLIO["customerID"].str.contains(query, case=False, na=False)]
+    matches = matches.head(limit)
+    return {
+        "results": [
+            {
+                "customerID": str(row["customerID"]),
+                "churn_probability": round(float(row["churn_probability"]), 4),
+                "risk_tier": str(row["risk_tier"]),
+                "MonthlyCharges": float(row["MonthlyCharges"]),
+                "Contract": str(row["Contract"]),
+            }
+            for _, row in matches.iterrows()
+        ],
+        "total": len(matches),
+    }
+
+
+# ── Watch List ──────────────────────────────────────────────────────────────
+
+@app.get("/watchlist", tags=["Watch List"])
+def watch_list(
+    min_probability: float = Query(0.6, ge=0, le=1),
+    sort_by: str = Query("revenue_at_risk"),
+    limit: int = Query(50, ge=1, le=200),
+):
+    df = PORTFOLIO.copy()
+    df = df[df["churn_probability"] >= min_probability]
+    df["lifetime_months"] = df["Contract"].map(lambda c: _expected_lifetime_months(c))
+    df["revenue_at_risk"] = df["churn_probability"] * df["MonthlyCharges"] * df["lifetime_months"]
+
+    if sort_by in df.columns:
+        df = df.sort_values(sort_by, ascending=False)
+
+    records = []
+    for _, row in df.head(limit).iterrows():
+        needs_action = []
+        if row.get("Contract") == "Month-to-month":
+            needs_action.append("Contract upgrade")
+        if row.get("TechSupport") == "No" and row.get("InternetService") != "No":
+            needs_action.append("Add tech support")
+        if row.get("PaymentMethod") == "Electronic check":
+            needs_action.append("Switch to auto-pay")
+
+        records.append({
+            "customerID": str(row.get("customerID", "")),
+            "churn_probability": round(float(row["churn_probability"]), 4),
+            "risk_tier": str(row["risk_tier"]),
+            "Contract": str(row.get("Contract", "")),
+            "MonthlyCharges": float(row.get("MonthlyCharges", 0)),
+            "tenure": int(row.get("tenure", 0)),
+            "revenue_at_risk": round(float(row["revenue_at_risk"]), 2),
+            "quick_actions": needs_action,
+        })
+
+    return {
+        "customers": records,
+        "total": len(df),
+        "threshold": min_probability,
+    }
+
+
+# ── Segment Explorer ────────────────────────────────────────────────────────
+
+class SegmentFilter(BaseModel):
+    contract: Optional[str] = None
+    internet_service: Optional[str] = None
+    min_tenure: Optional[int] = None
+    max_tenure: Optional[int] = None
+    min_monthly: Optional[float] = None
+    max_monthly: Optional[float] = None
+    senior_citizen: Optional[int] = None
+    partner: Optional[str] = None
+    tech_support: Optional[str] = None
+    payment_method: Optional[str] = None
+
+
+@app.post("/segments/analyze", tags=["Segments"])
+def segment_analyze(filters: SegmentFilter):
+    df = PORTFOLIO.copy()
+
+    if filters.contract:
+        df = df[df["Contract"] == filters.contract]
+    if filters.internet_service:
+        df = df[df["InternetService"] == filters.internet_service]
+    if filters.min_tenure is not None:
+        df = df[df["tenure"] >= filters.min_tenure]
+    if filters.max_tenure is not None:
+        df = df[df["tenure"] <= filters.max_tenure]
+    if filters.min_monthly is not None:
+        df = df[df["MonthlyCharges"] >= filters.min_monthly]
+    if filters.max_monthly is not None:
+        df = df[df["MonthlyCharges"] <= filters.max_monthly]
+    if filters.senior_citizen is not None:
+        df = df[df["SeniorCitizen"] == filters.senior_citizen]
+    if filters.partner:
+        df = df[df["Partner"] == filters.partner]
+    if filters.tech_support:
+        df = df[df["TechSupport"] == filters.tech_support]
+    if filters.payment_method:
+        df = df[df["PaymentMethod"] == filters.payment_method]
+
+    if len(df) == 0:
+        return {"segment_size": 0, "error": "No customers match these filters"}
+
+    df["lifetime_months"] = df["Contract"].map(lambda c: _expected_lifetime_months(c))
+    df["revenue_at_risk"] = df["churn_probability"] * df["MonthlyCharges"] * df["lifetime_months"]
+
+    tier_counts = df["risk_tier"].value_counts().to_dict()
+    contract_counts = df["Contract"].value_counts().to_dict()
+
+    # Top risk factors for this segment (most common attributes)
+    risk_profile = {}
+    for col in ["Contract", "InternetService", "PaymentMethod", "TechSupport", "OnlineSecurity"]:
+        if col in df.columns:
+            risk_profile[col] = df[col].value_counts().to_dict()
+
+    return {
+        "segment_size": len(df),
+        "pct_of_total": round(len(df) / len(PORTFOLIO) * 100, 1),
+        "avg_churn_probability": round(float(df["churn_probability"].mean()), 4),
+        "median_churn_probability": round(float(df["churn_probability"].median()), 4),
+        "high_risk_count": int((df["risk_tier"] == "high").sum()),
+        "avg_monthly_charges": round(float(df["MonthlyCharges"].mean()), 2),
+        "avg_tenure": round(float(df["tenure"].mean()), 1),
+        "total_revenue_at_risk": round(float(df["revenue_at_risk"].sum()), 0),
+        "avg_revenue_at_risk": round(float(df["revenue_at_risk"].mean()), 2),
+        "tier_breakdown": {k: int(v) for k, v in tier_counts.items()},
+        "contract_breakdown": {k: int(v) for k, v in contract_counts.items()},
+        "risk_profile": risk_profile,
+    }
+
+
+# ── Executive Summary ───────────────────────────────────────────────────────
+
+@app.get("/executive/summary", tags=["Executive"])
+def executive_summary():
+    df = PORTFOLIO.copy()
+    total = len(df)
+    df["lifetime_months"] = df["Contract"].map(lambda c: _expected_lifetime_months(c))
+    df["revenue_at_risk"] = df["churn_probability"] * df["MonthlyCharges"] * df["lifetime_months"]
+
+    high_risk = df[df["risk_tier"] == "high"]
+    medium_risk = df[df["risk_tier"] == "medium"]
+
+    # Top 3 recommended actions
+    actions = []
+    mtm_high = df[(df["Contract"] == "Month-to-month") & (df["risk_tier"] == "high")]
+    if len(mtm_high) > 0:
+        actions.append({
+            "priority": 1,
+            "action": "Target month-to-month high-risk customers for contract upgrades",
+            "affected_customers": len(mtm_high),
+            "revenue_at_risk": round(float(mtm_high["revenue_at_risk"].sum()), 0),
+            "category": "Contract",
+        })
+
+    no_tech = df[(df["TechSupport"] == "No") & (df["InternetService"] != "No") & (df["churn_probability"] > 0.5)]
+    if len(no_tech) > 0:
+        actions.append({
+            "priority": 2,
+            "action": "Offer free tech support trial to at-risk internet customers",
+            "affected_customers": len(no_tech),
+            "revenue_at_risk": round(float(no_tech["revenue_at_risk"].sum()), 0),
+            "category": "Service",
+        })
+
+    echeck = df[(df["PaymentMethod"] == "Electronic check") & (df["churn_probability"] > 0.4)]
+    if len(echeck) > 0:
+        actions.append({
+            "priority": 3,
+            "action": "Incentivize auto-pay enrollment for electronic check users",
+            "affected_customers": len(echeck),
+            "revenue_at_risk": round(float(echeck["revenue_at_risk"].sum()), 0),
+            "category": "Billing",
+        })
+
+    return {
+        "total_customers": total,
+        "churn_rate": round(float((df["Churn"].map({"Yes": 1, "No": 0, 1: 1, 0: 0})).mean()), 4),
+        "high_risk_count": len(high_risk),
+        "medium_risk_count": len(medium_risk),
+        "total_revenue_at_risk": round(float(df["revenue_at_risk"].sum()), 0),
+        "total_annual_revenue": round(float(df["MonthlyCharges"].sum() * 12), 0),
+        "avg_churn_probability": round(float(df["churn_probability"].mean()), 4),
+        "model_name": model_info.get("name", "unknown"),
+        "model_auc": round(float(
+            json.loads((ARTIFACTS / "results.json").read_text())
+            .get(model_info.get("name", ""), {})
+            .get("test", {})
+            .get("default", {})
+            .get("roc_auc", 0)
+        ), 4),
+        "top_actions": actions,
+        "risk_by_contract": {
+            contract: {
+                "count": len(subset),
+                "avg_churn": round(float(subset["churn_probability"].mean()), 4),
+                "high_risk": int((subset["risk_tier"] == "high").sum()),
+            }
+            for contract in ["Month-to-month", "One year", "Two year"]
+            if len(subset := df[df["Contract"] == contract]) > 0
+        },
+    }
+
+
 # ── Reports (serve images) ───────────────────────────────────────────────────
 
 @app.get("/reports/{filename}", tags=["Reports"])
