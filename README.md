@@ -375,13 +375,6 @@ Tree, Linear, Kernel, Neural compared on one pipeline.
 
 ---
 
-# 👩‍💻 Author
-
-**Zaynab Raounak**  
-Engineering Student | Machine Learning | Full-Stack AI Systems
-
----
-
 # ⭐ If You Like This Project
 
 Give it a star and connect with me.
